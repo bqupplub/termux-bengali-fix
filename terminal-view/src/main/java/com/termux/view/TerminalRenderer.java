@@ -107,8 +107,22 @@ public final class TerminalRenderer {
                 // This could happen for some fonts which are not truly monospace, or for more exotic characters such as
                 // smileys which android font renders as wide.
                 // If this is detected, we draw this code point scaled to match what wcwidth() expects.
-                final float measuredCodePointWidth = (codePoint < asciiMeasures.length) ? asciiMeasures[codePoint] : mTextPaint.measureText(line,
-                    currentCharIndex, charsForCodePoint);
+                int clusterStartIndex = currentCharIndex;
+                int nextCharIndex = currentCharIndex + charsForCodePoint;
+                while (nextCharIndex < charsUsedInLine) {
+                    int nextChars = Character.isHighSurrogate(line[nextCharIndex]) ? 2 : 1;
+                    int nextCodePoint = Character.isHighSurrogate(line[nextCharIndex]) ? Character.toCodePoint(line[nextCharIndex], line[nextCharIndex+1]) : line[nextCharIndex];
+                    if (WcWidth.width(nextCodePoint) <= 0 || com.termux.terminal.GraphemeClusterHelper.isGraphemeCluster(line, clusterStartIndex, nextCharIndex - clusterStartIndex, nextCodePoint)) {
+                        nextCharIndex += nextChars;
+                    } else {
+                        break;
+                    }
+                }
+
+                int charsForCluster = nextCharIndex - clusterStartIndex;
+
+                final float measuredCodePointWidth = (charsForCluster == 1 && codePoint < asciiMeasures.length) ? asciiMeasures[codePoint] : mTextPaint.measureText(line,
+                    clusterStartIndex, charsForCluster);
                 final boolean fontWidthMismatch = Math.abs(measuredCodePointWidth / mFontWidth - codePointWcWidth) > 0.01;
 
                 if (style != lastRunStyle || insideCursor != lastRunInsideCursor || insideSelection != lastRunInsideSelection || fontWidthMismatch || lastRunFontWidthMismatch) {
@@ -116,7 +130,7 @@ public final class TerminalRenderer {
                         // Skip first column as there is nothing to draw, just record the current style.
                     } else {
                         final int columnWidthSinceLastRun = column - lastRunStartColumn;
-                        final int charsSinceLastRun = currentCharIndex - lastRunStartIndex;
+                        final int charsSinceLastRun = clusterStartIndex - lastRunStartIndex;
                         int cursorColor = lastRunInsideCursor ? mEmulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] : 0;
                         boolean invertCursorTextColor = false;
                         if (lastRunInsideCursor && cursorShape == TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK) {
@@ -131,17 +145,12 @@ public final class TerminalRenderer {
                     lastRunInsideCursor = insideCursor;
                     lastRunInsideSelection = insideSelection;
                     lastRunStartColumn = column;
-                    lastRunStartIndex = currentCharIndex;
+                    lastRunStartIndex = clusterStartIndex;
                     lastRunFontWidthMismatch = fontWidthMismatch;
                 }
                 measuredWidthForRun += measuredCodePointWidth;
                 column += codePointWcWidth;
-                currentCharIndex += charsForCodePoint;
-                while (currentCharIndex < charsUsedInLine && WcWidth.width(line, currentCharIndex) <= 0) {
-                    // Eat combining chars so that they are treated as part of the last non-combining code point,
-                    // instead of e.g. being considered inside the cursor in the next run.
-                    currentCharIndex += Character.isHighSurrogate(line[currentCharIndex]) ? 2 : 1;
-                }
+                currentCharIndex = nextCharIndex;
             }
 
             final int columnWidthSinceLastRun = columns - lastRunStartColumn;
