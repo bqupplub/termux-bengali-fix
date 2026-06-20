@@ -2453,23 +2453,8 @@ public final class TerminalEmulator {
         }
 
         final boolean autoWrap = isDecsetInternalBitSet(DECSET_BIT_AUTOWRAP);
+        final int displayWidth = WcWidth.width(codePoint);
         final boolean cursorInLastColumn = mCursorCol == mRightMargin - 1;
-
-        int displayWidth = WcWidth.width(codePoint);
-        boolean isCombining = displayWidth <= 0;
-
-        if (!isCombining && mCursorCol > 0 && !mAboutToAutoWrap) {
-            TerminalRow row = mScreen.allocateFullLineIfNecessary(mScreen.externalToInternalRow(mCursorRow));
-            int prevCol = mCursorCol - 1;
-            int prevColStart = row.findStartOfColumn(prevCol);
-            int prevColLen = row.findStartOfColumn(mCursorCol) - prevColStart;
-            if (prevColLen > 0) {
-                if (GraphemeClusterHelper.isGraphemeCluster(row.mText, prevColStart, prevColLen, codePoint)) {
-                    isCombining = true;
-                    displayWidth = 0;
-                }
-            }
-        }
 
         if (autoWrap) {
             if (cursorInLastColumn && ((mAboutToAutoWrap && displayWidth == 1) || displayWidth == 2)) {
@@ -2494,7 +2479,7 @@ public final class TerminalEmulator {
                 mScreen.blockCopy(mCursorCol, mCursorRow, mRightMargin - destCol, 1, destCol, mCursorRow);
         }
 
-        int offsetDueToCombiningChar = ((isCombining && mCursorCol > 0 && !mAboutToAutoWrap) ? 1 : 0);
+        int offsetDueToCombiningChar = ((displayWidth <= 0 && mCursorCol > 0 && !mAboutToAutoWrap) ? 1 : 0);
         int column = mCursorCol - offsetDueToCombiningChar;
 
         // Fix TerminalRow.setChar() ArrayIndexOutOfBoundsException index=-1 exception reported
@@ -2502,7 +2487,7 @@ public final class TerminalEmulator {
         // so was mCursorCol changed after the offsetDueToCombiningChar conditional by another thread?
         // TODO: Check if there are thread synchronization issues with mCursorCol and mCursorRow, possibly causing others bugs too.
         if (column < 0) column = 0;
-        mScreen.setChar(column, mCursorRow, codePoint, getStyle(), isCombining);
+        mScreen.setChar(column, mCursorRow, codePoint, getStyle());
 
         if (autoWrap && displayWidth > 0)
             mAboutToAutoWrap = (mCursorCol == mRightMargin - displayWidth);

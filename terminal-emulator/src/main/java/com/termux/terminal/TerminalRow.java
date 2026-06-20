@@ -66,7 +66,6 @@ public final class TerminalRow {
         boolean startingFromSecondHalfOfWideChar = (sourceX1 > 0 && line.wideDisplayCharacterStartingAt(sourceX1 - 1));
         final char[] sourceChars = (this == line) ? Arrays.copyOf(line.mText, line.mText.length) : line.mText;
         int latestNonCombiningWidth = 0;
-        int clusterStartIndex = x1;
         for (int i = x1; i < x2; i++) {
             char sourceChar = sourceChars[i];
             int codePoint = Character.isHighSurrogate(sourceChar) ? Character.toCodePoint(sourceChar, sourceChars[++i]) : sourceChar;
@@ -75,24 +74,13 @@ public final class TerminalRow {
                 codePoint = ' ';
                 startingFromSecondHalfOfWideChar = false;
             }
-            
             int w = WcWidth.width(codePoint);
-            boolean isCombining = w <= 0;
-            
-            int codePointStartIndex = i - (Character.isSupplementaryCodePoint(codePoint) ? 1 : 0);
-            if (!isCombining && codePointStartIndex > clusterStartIndex) {
-                if (GraphemeClusterHelper.isGraphemeCluster(sourceChars, clusterStartIndex, codePointStartIndex - clusterStartIndex, codePoint)) {
-                    isCombining = true;
-                }
-            }
-
-            if (!isCombining) {
+            if (w > 0) {
                 destinationX += latestNonCombiningWidth;
                 sourceX1 += latestNonCombiningWidth;
                 latestNonCombiningWidth = w;
-                clusterStartIndex = codePointStartIndex;
             }
-            setChar(destinationX, codePoint, line.getStyle(sourceX1), isCombining);
+            setChar(destinationX, codePoint, line.getStyle(sourceX1));
         }
     }
 
@@ -162,10 +150,6 @@ public final class TerminalRow {
 
     // https://github.com/steven676/Android-Terminal-Emulator/commit/9a47042620bec87617f0b4f5d50568535668fe26
     public void setChar(int columnToSet, int codePoint, long style) {
-        setChar(columnToSet, codePoint, style, WcWidth.width(codePoint) <= 0);
-    }
-
-    public void setChar(int columnToSet, int codePoint, long style, boolean newIsCombining) {
         if (columnToSet  < 0 || columnToSet >= mStyle.length)
             throw new IllegalArgumentException("TerminalRow.setChar(): columnToSet=" + columnToSet + ", codePoint=" + codePoint + ", style=" + style);
 
@@ -183,7 +167,7 @@ public final class TerminalRow {
             }
         }
 
-        // newIsCombining is passed as parameter
+        final boolean newIsCombining = newCodePointDisplayWidth <= 0;
 
         boolean wasExtraColForWideChar = (columnToSet > 0) && wideDisplayCharacterStartingAt(columnToSet - 1);
 

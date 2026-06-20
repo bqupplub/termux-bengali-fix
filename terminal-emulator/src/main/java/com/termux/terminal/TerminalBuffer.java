@@ -449,14 +449,10 @@ public final class TerminalBuffer {
     }
 
     public void setChar(int column, int row, int codePoint, long style) {
-        setChar(column, row, codePoint, style, WcWidth.width(codePoint) <= 0);
-    }
-
-    public void setChar(int column, int row, int codePoint, long style, boolean isCombining) {
-        if (row < 0 || row >= mScreenRows || column < 0 || column >= mColumns)
+        if (row  < 0 || row >= mScreenRows || column < 0 || column >= mColumns)
             throw new IllegalArgumentException("TerminalBuffer.setChar(): row=" + row + ", column=" + column + ", mScreenRows=" + mScreenRows + ", mColumns=" + mColumns);
         row = externalToInternalRow(row);
-        allocateFullLineIfNecessary(row).setChar(column, codePoint, style, isCombining);
+        allocateFullLineIfNecessary(row).setChar(column, codePoint, style);
     }
 
     public long getStyleAt(int externalRow, int column) {
