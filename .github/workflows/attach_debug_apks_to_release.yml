@@ -25,7 +25,7 @@ jobs:
           ref: ${{ env.GITHUB_REF }}
 
       - name: set up JDK 11
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v5
         with:
           java-version: '11'
           distribution: 'temurin'
